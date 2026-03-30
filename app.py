@@ -2,7 +2,7 @@ import streamlit as st
 import random
 
 # 設定網頁標題與手機優化佈局
-st.set_page_config(page_title="半導體英單隨身測", page_icon="🧪", layout="centered")
+st.set_page_config(page_title="半導體英單 100 題全挑戰", page_icon="🧪", layout="centered")
 
 # --- 1. 完整 100 題資料庫 ---
 if 'word_pool' not in st.session_state:
@@ -44,40 +44,46 @@ if 'word_pool' not in st.session_state:
     ]
 
 # --- 2. 遊戲邏輯與狀態 ---
-TOTAL_Q = 10
+TOTAL_Q = 100 # 修改為 100 題全測驗
 if 'score' not in st.session_state:
     st.session_state.update({
         'score': 0, 'q_idx': 0, 'game_over': False, 'wrong_list': [],
         'answered': False, 'last_feedback': None
     })
 
-def get_next_q():
-    q = random.choice(st.session_state.word_pool)
+# 隨機打亂題目順序，確保每次挑戰順序不同
+if 'question_order' not in st.session_state:
+    indices = list(range(len(st.session_state.word_pool)))
+    random.shuffle(indices)
+    st.session_state.question_order = indices
+
+def get_current_word():
+    idx = st.session_state.question_order[st.session_state.q_idx]
+    q = st.session_state.word_pool[idx]
     wrong_zh = [w['zh'] for w in st.session_state.word_pool if w['zh'] != q['zh']]
     options = random.sample(wrong_zh, 3) + [q['zh']]
     random.shuffle(options)
     return q, options
 
 if 'curr_q' not in st.session_state:
-    st.session_state.curr_q, st.session_state.opts = get_next_q()
+    st.session_state.curr_q, st.session_state.opts = get_current_word()
 
 # --- 3. 遊戲介面 ---
-st.title("💡 半導體英單隨身測")
+st.title("💡 半導體英單 100 題大挑戰")
 
 if not st.session_state.game_over:
-    st.write(f"### 進度：{st.session_state.q_idx + 1} / {TOTAL_Q}")
+    st.write(f"### 目前進度：{st.session_state.q_idx + 1} / {TOTAL_Q}")
     st.progress((st.session_state.q_idx) / TOTAL_Q)
     st.markdown("---")
     
     st.write("#### 請選出正確的中文意思：")
     st.info(f"# **{st.session_state.curr_q['en']}**")
 
-    # 選項按鈕
     for o in st.session_state.opts:
         if st.button(o, use_container_width=True, disabled=st.session_state.answered):
             st.session_state.answered = True
             if o == st.session_state.curr_q['zh']:
-                st.session_state.score += 10
+                st.session_state.score += 1
                 st.session_state.last_feedback = ("success", "✅ 答對了！")
             else:
                 st.session_state.last_feedback = ("error", f"❌ 答錯了！正確答案是：{st.session_state.curr_q['zh']}")
@@ -88,7 +94,6 @@ if not st.session_state.game_over:
                 })
             st.rerun()
 
-    # 及時顯示正確/錯誤回饋
     if st.session_state.answered:
         type, msg = st.session_state.last_feedback
         if type == "success": st.success(msg)
@@ -100,27 +105,26 @@ if not st.session_state.game_over:
             if st.session_state.q_idx >= TOTAL_Q:
                 st.session_state.game_over = True
             else:
-                st.session_state.curr_q, st.session_state.opts = get_next_q()
+                st.session_state.curr_q, st.session_state.opts = get_current_word()
             st.rerun()
 
 else:
-    # --- 4. 結算畫面與錯題本 ---
+    # --- 4. 結算畫面 ---
     st.balloons()
-    st.header("🎊 測驗結束！")
-    st.metric("你的總分", f"{st.session_state.score} 分")
+    st.header("🎊 全數挑戰完成！")
+    st.metric("答對題數", f"{st.session_state.score} / {TOTAL_Q}")
     
     if st.session_state.wrong_list:
-        st.subheader("📝 錯題檢討區")
+        st.subheader("📝 錯題總複習")
         for item in st.session_state.wrong_list:
             with st.expander(f"❌ {item['word']}"):
                 st.write(f"**正確答案：** :green[{item['correct']}]")
                 st.write(f"**你的選擇：** :red[{item['yours']}]")
     else:
-        st.success("超級強！全部答對，良率 100%！🔥")
+        st.success("超級厲害！100 題全對，你是單字王！🔥")
 
-    if st.button("再考一次", use_container_width=True):
-        st.session_state.update({'score': 0, 'q_idx': 0, 'game_over': False, 'wrong_list': [], 'answered': False})
-        st.session_state.curr_q, st.session_state.opts = get_next_q()
+    if st.button("重新開始 100 題挑戰", use_container_width=True):
+        st.session_state.clear()
         st.rerun()
 
 st.markdown("---")
